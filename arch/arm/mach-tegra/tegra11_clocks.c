@@ -46,6 +46,7 @@
 #include "devices.h"
 #include "tegra11_emc.h"
 #include "tegra_cl_dvfs.h"
+#include "cpu-tegra.h"
 
 #define RST_DEVICES_L			0x004
 #define RST_DEVICES_H			0x008
@@ -4850,10 +4851,14 @@ static int tegra11_clk_cbus_enable(struct clk *c)
 	return 0;
 }
 
+/* select 5 steps below top rate as fine granularity region */
+#define CBUS_FINE_GRANULARITY		12000000	/* 12 MHz */
+#define CBUS_FINE_GRANULARITY_RANGE	(5 * CBUS_FINE_GRANULARITY)
+
 static long tegra11_clk_cbus_round_updown(struct clk *c, unsigned long rate,
 					  bool up)
 {
-	int i;
+	int i, n;
 
 	if (!c->dvfs) {
 		if (!c->min_rate)
@@ -4875,6 +4880,27 @@ static long tegra11_clk_cbus_round_updown(struct clk *c, unsigned long rate,
 	}
 	rate = max(rate, c->min_rate);
 
+	/* for top rates in fine granularity region don't clip to dvfs table */
+	n = c->dvfs->num_freqs;
+	if ((n >= 2) && (c->dvfs->millivolts[n-1] <= c->dvfs->max_millivolts) &&
+	    (rate > c->dvfs->freqs[n-2])) {
+		unsigned long threshold = max(c->dvfs->freqs[n-1],
+			c->dvfs->freqs[n-2] + CBUS_FINE_GRANULARITY_RANGE);
+		threshold -= CBUS_FINE_GRANULARITY_RANGE;
+
+		if (rate == threshold)
+			return threshold;
+
+		if (rate < threshold)
+			return up ? threshold : c->dvfs->freqs[n-2];
+
+		rate = (up ? DIV_ROUND_UP(rate, CBUS_FINE_GRANULARITY) :
+			rate / CBUS_FINE_GRANULARITY) * CBUS_FINE_GRANULARITY;
+		rate = clamp(rate, threshold, c->dvfs->freqs[n-1]);
+		return rate;
+	}
+
+	/* clip rate to dvfs table steps */
 	for (i = 0; ; i++) {
 		unsigned long f = c->dvfs->freqs[i];
 		int mv = c->dvfs->millivolts[i];
@@ -6591,7 +6617,7 @@ static struct clk tegra_clk_emc = {
 	.ops = &tegra_emc_clk_ops,
 	.reg = 0x19c,
 	.max_rate = 1066000000,
-	.min_rate = 204000000,  /* This is WAR for bug1296330 original rate was 12750000 */
+	.min_rate = 102000000,  /* This is WAR for bug1296330 original rate was 12750000 */
 	.inputs = mux_pllm_pllc_pllp_clkm,
 	.flags = MUX | MUX8 | DIV_U71 | PERIPH_EMC_ENB,
 	.u.periph = {
@@ -6604,6 +6630,9 @@ static struct raw_notifier_head host1x_rate_change_nh;
 
 static struct clk tegra_clk_host1x = {
 	.name      = "host1x",
+	.lookup    = {
+		.dev_id = "host1x",
+	},
 	.ops       = &tegra_1xbus_clk_ops,
 	.reg       = 0x180,
 	.inputs    = mux_pllm_pllc_pllp_plla,
@@ -6631,7 +6660,7 @@ static struct clk tegra_clk_c2bus = {
 	.name      = "c2bus",
 	.parent    = &tegra_pll_c2,
 	.ops       = &tegra_clk_cbus_ops,
-	.max_rate  = 700000000,
+	.max_rate  = 864000000,
 	.mul       = 1,
 	.div       = 1,
 	.flags     = PERIPH_ON_CBUS,
@@ -6859,11 +6888,11 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("uartc_dbg",	"serial8250.0",		"uartc", 55,	0x1a0,	408000000, mux_pllp_clkm,		MUX | DIV_U151 | DIV_U151_UART | PERIPH_ON_APB),
 	PERIPH_CLK("uartd_dbg",	"serial8250.0",		"uartd", 65,	0x1c0,	408000000, mux_pllp_clkm,		MUX | DIV_U151 | DIV_U151_UART | PERIPH_ON_APB),
 	PERIPH_CLK("uarte_dbg",	"serial8250.0",		"uarte", 66,	0x1c4,	408000000, mux_pllp_clkm,		MUX | DIV_U151 | DIV_U151_UART | PERIPH_ON_APB),
-	PERIPH_CLK("3d",	"3d",			NULL,	24,	0x158,	700000000, mux_pllm_pllc2_c_c3_pllp_plla,	MUX | MUX8 | DIV_U71 | DIV_U71_INT | DIV_U71_IDLE | PERIPH_MANUAL_RESET),
-	PERIPH_CLK("2d",	"2d",			NULL,	21,	0x15c,	700000000, mux_pllm_pllc2_c_c3_pllp_plla,	MUX | MUX8 | DIV_U71 | DIV_U71_INT | DIV_U71_IDLE),
+	PERIPH_CLK("3d",	"3d",			NULL,	24,	0x158,	864000000, mux_pllm_pllc2_c_c3_pllp_plla,	MUX | MUX8 | DIV_U71 | DIV_U71_INT | DIV_U71_IDLE | PERIPH_MANUAL_RESET),
+	PERIPH_CLK("2d",	"2d",			NULL,	21,	0x15c,	864000000, mux_pllm_pllc2_c_c3_pllp_plla,	MUX | MUX8 | DIV_U71 | DIV_U71_INT | DIV_U71_IDLE),
 	PERIPH_CLK_EX("vi",	"vi",			"vi",	20,	0x148,	425000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | DIV_U71_INT, &tegra_vi_clk_ops),
 	PERIPH_CLK("vi_sensor",	"vi",			"vi_sensor",	20,	0x1a8,	150000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | PERIPH_NO_RESET),
-	PERIPH_CLK("epp",	"epp",			NULL,	19,	0x16c,	700000000, mux_pllm_pllc2_c_c3_pllp_plla,	MUX | MUX8 | DIV_U71 | DIV_U71_INT),
+	PERIPH_CLK("epp",	"epp",			NULL,	19,	0x16c,	864000000, mux_pllm_pllc2_c_c3_pllp_plla,	MUX | MUX8 | DIV_U71 | DIV_U71_INT),
 #ifdef CONFIG_TEGRA_SIMULATION_PLATFORM
 	PERIPH_CLK("msenc",	"msenc",		NULL,	60,	0x170,	600000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | DIV_U71_INT),
 #else
@@ -7573,16 +7602,16 @@ unsigned long tegra_emc_to_cpu_ratio(unsigned long cpu_rate)
 
 	/* Vote on memory bus frequency based on cpu frequency;
 	   cpu rate is in kHz, emc rate is in Hz */
-	if (cpu_rate >= 1500000)
-		return emc_max_rate;	/* cpu >= 1.5GHz, emc max */
-	else if (cpu_rate >= 975000)
-		return 400000000;	/* cpu >= 975 MHz, emc 400 MHz */
-	else if (cpu_rate >= 725000)
-		return  200000000;	/* cpu >= 725 MHz, emc 200 MHz */
-	else if (cpu_rate >= 500000)
-		return  100000000;	/* cpu >= 500 MHz, emc 100 MHz */
-	else if (cpu_rate >= 275000)
-		return  50000000;	/* cpu >= 275 MHz, emc 50 MHz */
+	if (cpu_rate >= 1122000)
+		return emc_max_rate;	/* cpu >= 1122 MHz, emc max */
+	else if (cpu_rate >= 918000)
+		return 624000000;	/* cpu >= 918 MHz, emc 624 MHz */
+	else if (cpu_rate >= 714000)
+		return  408000000;	/* cpu >= 714 MHz, emc 408 MHz */
+	else if (cpu_rate >= 510000)
+		return  312000000;	/* cpu >= 510 MHz, emc 312 MHz */
+	else if (cpu_rate >= 306000)
+		return  204000000;	/* cpu >= 306 MHz, emc 204 MHz */
 	else
 		return 0;		/* emc min */
 }
@@ -7849,24 +7878,26 @@ static void tegra11_clk_resume(void)
 	p = tegra_clk_emc.parent;
 	tegra11_periph_clk_init(&tegra_clk_emc);
 
+	/* Turn Off pll_m if it was OFF before suspend, and emc was not switched
+	   to pll_m across suspend; re-init pll_m to sync s/w and h/w states */
+	if ((tegra_pll_m.state == OFF) &&
+	    (&tegra_pll_m != tegra_clk_emc.parent))
+		tegra11_pllm_clk_disable(&tegra_pll_m);
+	tegra11_pllm_clk_init(&tegra_pll_m);
+
 	if (p != tegra_clk_emc.parent) {
-		/* FIXME: old parent is left enabled here even if EMC was its
-		   only child before suspend (may happen on Tegra11 !!) */
 		pr_debug("EMC parent(refcount) across suspend: %s(%d) : %s(%d)",
 			p->name, p->refcnt, tegra_clk_emc.parent->name,
 			tegra_clk_emc.parent->refcnt);
 
-		BUG_ON(!p->refcnt);
-		p->refcnt--;
-
-		/* the new parent is enabled by low level code, but ref count
-		   need to be updated up to the root */
-		p = tegra_clk_emc.parent;
-		while (p && ((p->refcnt++) == 0))
-			p = p->parent;
+		/* emc switched to the new parent by low level code, but ref
+		   count and s/w state need to be updated */
+		clk_disable(p);
+		clk_enable(tegra_clk_emc.parent);
+		tegra_dvfs_set_rate(&tegra_clk_emc,
+				    clk_get_rate_all_locked(&tegra_clk_emc));
 	}
 	tegra_emc_timing_invalidate();
-	tegra11_pllm_clk_init(&tegra_pll_m); /* Re-init pll_m */
 	tegra11_pll_clk_init(&tegra_pll_u); /* Re-init utmi parameters */
 	tegra11_plle_clk_resume(&tegra_pll_e); /* Restore plle parent as pll_re_vco */
 	tegra11_pllp_clk_resume(&tegra_pll_p); /* Fire a bug if not restored */
