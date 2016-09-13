@@ -46,7 +46,6 @@
 #include "devices.h"
 #include "tegra11_emc.h"
 #include "tegra_cl_dvfs.h"
-#include "cpu-tegra.h"
 
 #define RST_DEVICES_L			0x004
 #define RST_DEVICES_H			0x008
@@ -4851,14 +4850,10 @@ static int tegra11_clk_cbus_enable(struct clk *c)
 	return 0;
 }
 
-/* select 5 steps below top rate as fine granularity region */
-#define CBUS_FINE_GRANULARITY		12000000	/* 12 MHz */
-#define CBUS_FINE_GRANULARITY_RANGE	(5 * CBUS_FINE_GRANULARITY)
-
 static long tegra11_clk_cbus_round_updown(struct clk *c, unsigned long rate,
 					  bool up)
 {
-	int i, n;
+	int i;
 
 	if (!c->dvfs) {
 		if (!c->min_rate)
@@ -4880,27 +4875,6 @@ static long tegra11_clk_cbus_round_updown(struct clk *c, unsigned long rate,
 	}
 	rate = max(rate, c->min_rate);
 
-	/* for top rates in fine granularity region don't clip to dvfs table */
-	n = c->dvfs->num_freqs;
-	if ((n >= 2) && (c->dvfs->millivolts[n-1] <= c->dvfs->max_millivolts) &&
-	    (rate > c->dvfs->freqs[n-2])) {
-		unsigned long threshold = max(c->dvfs->freqs[n-1],
-			c->dvfs->freqs[n-2] + CBUS_FINE_GRANULARITY_RANGE);
-		threshold -= CBUS_FINE_GRANULARITY_RANGE;
-
-		if (rate == threshold)
-			return threshold;
-
-		if (rate < threshold)
-			return up ? threshold : c->dvfs->freqs[n-2];
-
-		rate = (up ? DIV_ROUND_UP(rate, CBUS_FINE_GRANULARITY) :
-			rate / CBUS_FINE_GRANULARITY) * CBUS_FINE_GRANULARITY;
-		rate = clamp(rate, threshold, c->dvfs->freqs[n-1]);
-		return rate;
-	}
-
-	/* clip rate to dvfs table steps */
 	for (i = 0; ; i++) {
 		unsigned long f = c->dvfs->freqs[i];
 		int mv = c->dvfs->millivolts[i];
@@ -6617,7 +6591,7 @@ static struct clk tegra_clk_emc = {
 	.ops = &tegra_emc_clk_ops,
 	.reg = 0x19c,
 	.max_rate = 1066000000,
-	.min_rate = 102000000,  /* This is WAR for bug1296330 original rate was 12750000 */
+	.min_rate = 204000000,  /* This is WAR for bug1296330 original rate was 12750000 */
 	.inputs = mux_pllm_pllc_pllp_clkm,
 	.flags = MUX | MUX8 | DIV_U71 | PERIPH_EMC_ENB,
 	.u.periph = {
@@ -6630,9 +6604,6 @@ static struct raw_notifier_head host1x_rate_change_nh;
 
 static struct clk tegra_clk_host1x = {
 	.name      = "host1x",
-	.lookup    = {
-		.dev_id = "host1x",
-	},
 	.ops       = &tegra_1xbus_clk_ops,
 	.reg       = 0x180,
 	.inputs    = mux_pllm_pllc_pllp_plla,
@@ -7878,26 +7849,24 @@ static void tegra11_clk_resume(void)
 	p = tegra_clk_emc.parent;
 	tegra11_periph_clk_init(&tegra_clk_emc);
 
-	/* Turn Off pll_m if it was OFF before suspend, and emc was not switched
-	   to pll_m across suspend; re-init pll_m to sync s/w and h/w states */
-	if ((tegra_pll_m.state == OFF) &&
-	    (&tegra_pll_m != tegra_clk_emc.parent))
-		tegra11_pllm_clk_disable(&tegra_pll_m);
-	tegra11_pllm_clk_init(&tegra_pll_m);
-
 	if (p != tegra_clk_emc.parent) {
+		/* FIXME: old parent is left enabled here even if EMC was its
+		   only child before suspend (may happen on Tegra11 !!) */
 		pr_debug("EMC parent(refcount) across suspend: %s(%d) : %s(%d)",
 			p->name, p->refcnt, tegra_clk_emc.parent->name,
 			tegra_clk_emc.parent->refcnt);
 
-		/* emc switched to the new parent by low level code, but ref
-		   count and s/w state need to be updated */
-		clk_disable(p);
-		clk_enable(tegra_clk_emc.parent);
-		tegra_dvfs_set_rate(&tegra_clk_emc,
-				    clk_get_rate_all_locked(&tegra_clk_emc));
+		BUG_ON(!p->refcnt);
+		p->refcnt--;
+
+		/* the new parent is enabled by low level code, but ref count
+		   need to be updated up to the root */
+		p = tegra_clk_emc.parent;
+		while (p && ((p->refcnt++) == 0))
+			p = p->parent;
 	}
 	tegra_emc_timing_invalidate();
+	tegra11_pllm_clk_init(&tegra_pll_m); /* Re-init pll_m */
 	tegra11_pll_clk_init(&tegra_pll_u); /* Re-init utmi parameters */
 	tegra11_plle_clk_resume(&tegra_pll_e); /* Restore plle parent as pll_re_vco */
 	tegra11_pllp_clk_resume(&tegra_pll_p); /* Fire a bug if not restored */
