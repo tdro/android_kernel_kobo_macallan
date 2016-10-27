@@ -41,11 +41,11 @@ DECLARE_EVENT_CLASS(loadeval,
 		    TP_ARGS(cpu_id, load, curtarg, curactual, newtarg),
 
 	    TP_STRUCT__entry(
-		    __field(unsigned long, cpu_id    )
-		    __field(unsigned long, load      )
-		    __field(unsigned long, curtarg   )
-		    __field(unsigned long, curactual )
-		    __field(unsigned long, newtarg   )
+		    __field(unsigned long, cpu_id)
+		    __field(unsigned long, load)
+		    __field(unsigned long, curtarg)
+		    __field(unsigned long, curactual)
+		    __field(unsigned long, newtarg)
 	    ),
 
 	    TP_fast_assign(
