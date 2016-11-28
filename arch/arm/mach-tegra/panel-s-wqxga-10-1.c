@@ -34,9 +34,6 @@
 #include "gpio-names.h"
 #include "tegra11_host1x_devices.h"
 
-#ifdef CONFIG_POWERSUSPEND
-#include <linux/powersuspend.h>
-#endif
 
 #define TEGRA_DSI_GANGED_MODE	1
 
@@ -349,10 +346,6 @@ static int dsi_s_wqxga_10_1_enable(struct device *dev)
 	msleep(20);
 #endif
 
-    #ifdef CONFIG_POWERSUSPEND
-    set_power_suspend_state_hook(POWER_SUSPEND_INACTIVE);
-    #endif
-
 	return 0;
 fail:
 	return err;
@@ -374,10 +367,6 @@ static int dsi_s_wqxga_10_1_disable(void)
 
 	/* Remember the time when the panel being power down */
 	read_persistent_clock(&timestamp_lcd_off);
-
-    #ifdef CONFIG_POWERSUSPEND
-    set_power_suspend_state_hook(POWER_SUSPEND_ACTIVE);
-    #endif
 
 	return 0;
 }

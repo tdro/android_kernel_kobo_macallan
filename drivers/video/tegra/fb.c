@@ -44,6 +44,10 @@
 #include "nvmap/nvmap.h"
 #include "dc/dc_priv.h"
 
+#ifdef CONFIG_POWERSUSPEND
+#include <linux/powersuspend.h>
+#endif
+
 /* Pad pitch to 256-byte boundary. */
 #define TEGRA_LINEAR_PITCH_ALIGNMENT 256
 
@@ -281,6 +285,9 @@ static int tegra_fb_blank(int blank, struct fb_info *info)
 	switch (blank) {
 	case FB_BLANK_UNBLANK:
 		dev_dbg(&tegra_fb->ndev->dev, "unblank\n");
+		#ifdef CONFIG_POWERSUSPEND
+		set_power_suspend_state_hook(POWER_SUSPEND_INACTIVE);
+		#endif
 		tegra_fb->win->flags = TEGRA_WIN_FLAG_ENABLED;
 		tegra_dc_enable(tegra_fb->win->dc);
 		tegra_dc_update_windows(&tegra_fb->win, 1);
@@ -299,6 +306,9 @@ static int tegra_fb_blank(int blank, struct fb_info *info)
 	case FB_BLANK_HSYNC_SUSPEND:
 	case FB_BLANK_POWERDOWN:
 		dev_dbg(&tegra_fb->ndev->dev, "blank - powerdown\n");
+		#ifdef CONFIG_POWERSUSPEND
+		set_power_suspend_state_hook(POWER_SUSPEND_ACTIVE);
+		#endif
 		/* To pan fb while switching from X */
 		if (!tegra_fb->win->dc->suspended && tegra_fb->win->dc->enabled)
 			tegra_fb->curr_xoffset = -1;
