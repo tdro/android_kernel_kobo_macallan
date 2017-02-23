@@ -126,7 +126,7 @@ static int fts_readb(struct fts_info *ts, u8 addr, u8 *value)
 
 	ret = i2c_transfer(ts->client->adapter, msg, 2);
 	if (ret < 0){
-		fts_msg("i2c_transfer failed !\n");
+		/*fts_msg("i2c_transfer failed !\n");*/
 		return ret;
 	}
 
@@ -304,7 +304,7 @@ static int fts_verify_dev(struct fts_info *ts)
 
 	if(fts_readb(ts, 0xA3, &id))
 	{
-		fts_msg("Can't get chip id\n");
+		/*fts_msg("Can't get chip id\n");*/
 		return -ENODEV;
 	}
 
