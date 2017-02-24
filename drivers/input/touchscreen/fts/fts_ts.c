@@ -90,7 +90,7 @@ static int fts_readsb(struct fts_info *ts, u8 *addr, u8 *buf, u16 len)
 	}
 
 	if (ret < 0){
-		fts_msg("i2c_transfer failed !\n");
+		fts_msg("i2c_transfer failed !");
 		return ret;
 	}
 
@@ -107,7 +107,7 @@ static int fts_writesb(struct fts_info *ts, u8 *buf, u16 len)
 
 	ret = i2c_transfer(ts->client->adapter, &msg, 1);
 	if (ret < 0){
-		fts_msg("i2c_transfer failed !\n");
+		fts_msg("i2c_transfer failed !");
 		return ret;
 	}
 
@@ -126,11 +126,11 @@ static int fts_readb(struct fts_info *ts, u8 addr, u8 *value)
 
 	ret = i2c_transfer(ts->client->adapter, msg, 2);
 	if (ret < 0){
-		/*fts_msg("i2c_transfer failed !\n");*/
+		/*fts_msg("i2c_transfer failed !");*/
 		return ret;
 	}
 
-	fts_dbg("Read %02X = 0x%02X\n", addr, *value);
+	fts_dbg("Read %02X = 0x%02X", addr, *value);
 
 	return 0;
 }
@@ -149,7 +149,7 @@ static int fts_writeb(struct fts_info *ts, u8 addr, u8 value)
 
 	ret = i2c_transfer(ts->client->adapter, &msg, 1);
 	if (ret < 0){
-		fts_msg("i2c_transfer failed !\n");
+		fts_msg("i2c_transfer failed !");
 		return ret;
 	}
 
@@ -204,7 +204,7 @@ static int fts_fw_version(struct fts_info *ts, u8 *version)
 	ret = fts_readb(ts, REG_FW_VER, version);
 	
 	if(ret){
-		fts_msg("Can't read firmware version !\n");
+		fts_msg("Can't read firmware version !");
 		return -ENODEV;
 	}
 
@@ -232,7 +232,7 @@ static char* fts_ctpm_fw_version(struct fts_info *ts, u8 *version)
 
 	memset(fw_ver_buf,0,sizeof(fw_ver_buf));
 	if(fts_fw_version(ts, version)) {
-		fts_msg("FTS read version is fail !\n");
+		fts_msg("FTS read version is fail !");
 		strcpy(fw_ver_buf,"fail");
 	}
 	else {
@@ -304,7 +304,7 @@ static int fts_verify_dev(struct fts_info *ts)
 
 	if(fts_readb(ts, 0xA3, &id))
 	{
-		/*fts_msg("Can't get chip id\n");*/
+		/*fts_msg("Can't get chip id");*/
 		return -ENODEV;
 	}
 
@@ -315,30 +315,30 @@ static int fts_verify_dev(struct fts_info *ts)
 	else {
 		ts->ctpm_id = CTPM_GG_ID;
 	}
-	fts_msg("FTS CTPM ID = 0x%02X !\n", ts->ctpm_id);
+	fts_msg("FTS CTPM ID = 0x%02X !", ts->ctpm_id);
 #endif
 
 	switch (id){
 		case FT5x06_ID:
-			fts_msg("FTS FT5x06 Chip\n");
+			fts_msg("FTS FT5x06 Chip");
 			break;		
 		case FT5x16_ID:
-			fts_msg("FTS FT5x16 Chip\n");
+			fts_msg("FTS FT5x16 Chip");
 			break;		
 		case FT5606_ID:
-			fts_msg("FTS FT5606 Chip\n");
+			fts_msg("FTS FT5606 Chip");
 			break;
 		case FT6x06_ID:
-			fts_msg("FTS FT6X06 Chip\n");
+			fts_msg("FTS FT6X06 Chip");
 			break;
 		default:
-			fts_msg("Can't support unknown chip\n");
+			fts_msg("Can't support unknown chip");
 			return -ENODEV;
 			break;
 	}
 
 	ts->chip_id = id;
-	fts_msg("FTS Chip ID = 0x%02X !\n", ts->chip_id);
+	fts_msg("FTS Chip ID = 0x%02X !", ts->chip_id);
 
 #ifdef FTS_EXTENSION
 	fts_get_upgrade_info(ts);
@@ -365,7 +365,7 @@ static void fts_input_report(struct fts_info *ts, struct fts_packet_info *buf)
 		x = (u16)(touch->x_msb << 8) | (u16)touch->x_lsb;
 		y = (u16)(touch->y_msb << 8) | (u16)touch->y_lsb;
 
-		fts_dbg("ID = %d, Event = %d, X = %d, Y = %d\n", touch->id, touch->event, x, y);
+		fts_dbg("ID = %d, Event = %d, X = %d, Y = %d", touch->id, touch->event, x, y);
 
 #ifdef TOUCH_REPORT_TYPE_A
 		if ((touch->event == F_DOWN) || (touch->event == F_CONTACT)){
@@ -392,7 +392,7 @@ static void fts_input_report(struct fts_info *ts, struct fts_packet_info *buf)
 			input_mt_report_slot_state(ts->input_dev, MT_TOOL_FINGER, false);
 		}
 
-		fts_dbg("ID %d Event %d, X = %d, Y = %d\n", touch->id, touch->event, x, y);
+		fts_dbg("ID %d Event %d, X = %d, Y = %d", touch->id, touch->event, x, y);
 
 		touch_type |= POINTER_TOUCH;
 #endif
@@ -457,7 +457,7 @@ static void fts_suspend(struct fts_info *ts)
 
 	int err;
 
-	fts_dbg("called\n");
+	fts_msg("called");
 
 	disable_irq(ts->client->irq);
 
@@ -477,7 +477,7 @@ static void fts_suspend(struct fts_info *ts)
 static void fts_resume(struct fts_info *ts)
 {
 
-	fts_dbg("called\n");
+	fts_msg("called");
 
 #ifdef HW_PWR_ONOFF
 	/* hardware power on */
@@ -544,7 +544,7 @@ static int fts_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	probe_state ++;
 #endif
 	if(!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)){
-		fts_msg("FTS: need I2C_FUNC_I2C\n");
+		fts_msg("FTS: need I2C_FUNC_I2C");
 		return -ENODEV;
 	}
 
@@ -557,7 +557,7 @@ static int fts_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	i2c_set_clientdata(client, ts);
 	ts->pdata = pdata;
 
-	fts_dbg("%s install %02X\n", DRIVER_DESC, client->addr);
+	fts_dbg("%s install %02X", DRIVER_DESC, client->addr);
 
 	if((err = fts_init_dev(ts)) < 0)
 		goto out_free;
@@ -613,7 +613,7 @@ static int fts_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	}
 
 	if(client->irq){
-		fts_dbg("Using IRQ %d\n", client->irq);
+		fts_dbg("Using IRQ %d", client->irq);
 
 		err = request_threaded_irq(client->irq, NULL, fts_irq, pdata->irqflags, client->dev.driver->name, ts);
 
@@ -623,18 +623,18 @@ static int fts_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		}
 	}
 	else{
-		fts_msg("No IRQ resource\n");
+		fts_msg("No IRQ resource");
 		goto out_unregister_device;
 	}
 
 	if(fts_init_sysfs(ts)) {
-		fts_msg("create sysfs failed\n");
+		fts_msg("create sysfs failed");
 		fts_release_sysfs(ts);
 	}
 
 #ifdef WISTRON_EXTENSION
 	if(fts_create_proc(ts)) {
-		fts_msg("create proc failed\n");
+		fts_msg("create proc failed");
 	}
 
 	probe_state |= PROBE_DONE;		   
@@ -657,7 +657,7 @@ out_free:
 		kfree(ts);
 		return err;
 	}
-	//fts_msg("addr=[%02x] out_free probe_state[%x]! and close power\n",ts->client->addr,probe_state);
+	//fts_msg("addr=[%02x] out_free probe_state[%x]! and close power",ts->client->addr,probe_state);
 #endif
 	/* Put reset pin in low and delay 2ms */
 	fts_gpio_reset(ts,PULL_RESET_LOW);
@@ -673,7 +673,7 @@ static int fts_remove(struct i2c_client *client)
 {
 	struct fts_info *ts = i2c_get_clientdata(client);
 
-	fts_dbg("called\n");
+	fts_dbg("called");
 
 	free_irq(client->irq, ts);
 
