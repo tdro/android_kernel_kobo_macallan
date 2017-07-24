@@ -290,7 +290,7 @@ static int bq2419x_get_battery_status(void)
 
 	result = psy->get_property(psy,POWER_SUPPLY_PROP_STATUS ,&status);
 	if(!result) {
-		printk("The battery status is %d\n",status.intval);
+		/*printk("The battery status is %d\n",status.intval);*/
 		return status.intval;
 	}
 	else
